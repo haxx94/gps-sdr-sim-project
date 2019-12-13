@@ -82,7 +82,8 @@ int cosTable512[] = {
 	 245, 246, 247, 247, 248, 248, 248, 249, 249, 249, 249, 250, 250, 250, 250, 250
 };
 /*
-funzione che converte da gpstime_t a numero di giorni passati da gennaio
+gpstime-T g=input
+Converte da gpstime_t a numero di giorni passati da gennaio
 Serve per il modello della troposfera
 */
 int gpsTimeToGiorni(gpstime_t g) {
@@ -99,6 +100,206 @@ int gpsTimeToGiorni(gpstime_t g) {
 	int giorniTOT = (int)days;
 	int giorniDaGennaio = giorniTOT % 365;
 	return giorniDaGennaio;
+}
+/*
+(double startV, double endV, int startG, int endG, double grad)=input
+//Interpola i valori in base al range di valori del modello, range di inclinazione e inclinazione attuale.
+*/
+double calcval(double startV, double endV, int startG, int endG, double grad) {
+	double rangeG = endG - startG;
+	double gradNorm = grad - startG;
+	double percentuale = gradNorm / rangeG; //(compresa tra 0 e 1)
+
+	double rangeV = endV - startV;
+	double daSommareAlMin = rangeV * percentuale;
+	double risultato = startV + daSommareAlMin;
+
+	return risultato;
+}
+/*
+(char grandezza, double latitudine, int giornoAnno)=input
+grandezza è un char tra (P,T,e,b,l) e rappresentano i coefficienti relativi ai parametri ambientali 
+tabellati nel modello troposferico, in base alla latitudine del ricevitore e il giorno dell'anno.
+*/
+double parametroTropos(char grandezza, double latitudine, int giornoAnno) {
+	double absLatitudine = latitudine;
+	double Dmin = 28;//Northern latitudes
+
+	if (absLatitudine < 0) {
+		Dmin = 211;//Southern latitudes
+		absLatitudine = absLatitudine * (-1);
+	}//faccio il valore assoluto della latitudine per averla sempre positiva.
+
+	double param0 = 0;
+	double paramDelta = 0;
+	double param = 0;
+
+	switch (grandezza) {
+	case 'P':
+		if (absLatitudine <= 15) {
+			param0 = 1013.25;
+			paramDelta = 0;
+		}
+		else if (absLatitudine > 15 && absLatitudine <= 30) {
+			param0 = calcval(1013.25, 1017.25, 15, 30, latitudine);
+			paramDelta = calcval(0, 3.75, 15, 30, latitudine) * (-1);//*(-1) perchè nella tabella è negativo
+		}
+		else if (absLatitudine > 30 && absLatitudine <= 45) {
+			param0 = calcval(1017.25, 1015.75, 30, 45, latitudine);
+			paramDelta = calcval(3.75, 2.25, 30, 45, latitudine) * (-1);
+		}
+		else if (absLatitudine > 45 && absLatitudine <= 60) {
+			param0 = calcval(1015.75, 1011.75, 45, 60, latitudine);
+			paramDelta = calcval(2.25, 1.75, 45, 60, latitudine) * (-1);
+		}
+		else if (absLatitudine > 60 && absLatitudine < 75) {
+			param0 = calcval(1011.75, 1013, 60, 75, latitudine);
+			paramDelta = calcval(1.75, 0.5, 60, 75, latitudine) * (-1);
+		}
+		else if (absLatitudine >= 75) {
+			param0 = 1013.0;
+			paramDelta = -0.50;
+		}
+		break;
+
+	case 'T':
+		if (absLatitudine <= 15) {
+			param0 = 299.65;
+			paramDelta = 0;
+		}
+		else if (absLatitudine > 15 && absLatitudine <= 30) {
+			param0 = calcval(299.65, 294.15, 15, 30, latitudine);
+			paramDelta = calcval(0, 7, 15, 30, latitudine);
+		}
+		else if (absLatitudine > 30 && absLatitudine <= 45) {
+			param0 = calcval(294.15, 283.15, 30, 45, latitudine);
+			paramDelta = calcval(7, 11, 30, 45, latitudine);
+		}
+		else if (absLatitudine > 45 && absLatitudine <= 60) {
+			param0 = calcval(283.15, 272.15, 45, 60, latitudine);
+			paramDelta = calcval(11, 15, 45, 60, latitudine);
+		}
+		else if (absLatitudine > 60 && absLatitudine < 75) {
+			param0 = calcval(272.15, 263.65, 60, 75, latitudine);
+			paramDelta = calcval(15, 14.5, 60, 75, latitudine);
+		}
+		else if (absLatitudine >= 75) {
+			param0 = 263.65;
+			paramDelta = 14.50;
+		}
+		break;
+
+	case 'e':
+		if (absLatitudine <= 15) {
+			param0 = 26.31;
+			paramDelta = 0.0;
+		}
+		else if (absLatitudine > 15 && absLatitudine <= 30) {
+			param0 = calcval(26.31, 21.79, 15, 30, latitudine);
+			paramDelta = calcval(0.0, 8.85, 15, 30, latitudine);
+		}
+		else if (absLatitudine > 30 && absLatitudine <= 45) {
+			param0 = calcval(21.79, 11.66, 30, 45, latitudine);
+			paramDelta = calcval(8.85, 7.24, 30, 45, latitudine);
+		}
+		else if (absLatitudine > 45 && absLatitudine <= 60) {
+			param0 = calcval(11.66, 6.78, 45, 60, latitudine);
+			paramDelta = calcval(7.24, 5.36, 45, 60, latitudine);
+		}
+		else if (absLatitudine > 60 && absLatitudine < 75) {
+			param0 = calcval(6.78, 4.11, 60, 75, latitudine);
+			paramDelta = calcval(5.36, 3.39, 60, 75, latitudine);
+		}
+		else if (absLatitudine >= 75) {
+			param0 = 4.11;
+			paramDelta = 3.39;
+		}
+		break;
+
+	case 'b':
+		if (absLatitudine <= 15) {
+			param0 = 0.0063;
+			paramDelta = 0.0;
+		}
+		else if (absLatitudine > 15 && absLatitudine <= 30) {
+			param0 = calcval(0.0063, 0.00605, 15, 30, latitudine);
+			paramDelta = calcval(0.0, 0.00025, 15, 30, latitudine);
+		}
+		else if (absLatitudine > 30 && absLatitudine <= 45) {
+			param0 = calcval(0.00605, 0.00558, 30, 45, latitudine);
+			paramDelta = calcval(0.00025, 0.00032, 30, 45, latitudine);
+		}
+		else if (absLatitudine > 45 && absLatitudine <= 60) {
+			param0 = calcval(0.00558, 0.00539, 45, 60, latitudine);
+			paramDelta = calcval(0.00032, 0.00081, 45, 60, latitudine);
+		}
+		else if (absLatitudine > 60 && absLatitudine < 75) {
+			param0 = calcval(0.00539, 0.00453, 60, 75, latitudine);
+			paramDelta = calcval(0.00081, 0.00062, 60, 75, latitudine);
+		}
+		else if (absLatitudine >= 75) {
+			param0 = 0.00453;
+			paramDelta = 0.00062;
+		}
+		break;
+
+	case 'l':
+		if (absLatitudine <= 15) {
+			param0 = 2.77;
+			paramDelta = 0.0;
+		}
+		else if (absLatitudine > 15 && absLatitudine <= 30) {
+			param0 = calcval(2.77, 3.15, 15, 30, latitudine);
+			paramDelta = calcval(0.0, 0.33, 15, 30, latitudine);
+		}
+		else if (absLatitudine > 30 && absLatitudine <= 45) {
+			param0 = calcval(3.15, 2.57, 30, 45, latitudine);
+			paramDelta = calcval(0.33, 0.46, 30, 45, latitudine);
+		}
+		else if (absLatitudine > 45 && absLatitudine <= 60) {
+			param0 = calcval(2.57, 1.81, 45, 60, latitudine);
+			paramDelta = calcval(0.46, 0.74, 45, 60, latitudine);
+		}
+		else if (absLatitudine > 60 && absLatitudine < 75) {
+			param0 = calcval(1.81, 1.55, 60, 75, latitudine);
+			paramDelta = calcval(0.74, 0.30, 60, 75, latitudine);
+		}
+		else if (absLatitudine >= 75) {
+			param0 = 1.55;
+			paramDelta = 0.30;
+		}
+		break;
+
+	}
+	param = param0 - paramDelta * cos((2 * PI * (giornoAnno - Dmin)) / 365.25);
+	return param;
+}
+/*
+(gpstime_t g, double* llh, double* azel)=input
+Calcola il ritardo del segnale in metri dovuto alla troposfera.
+*/
+double troposphericDelay(gpstime_t g, double* llh, double* azel) {
+	//in C l'argomento di sin e cos va messo in radianti
+	double Me = 1.001 / sqrt(0.002001 + pow(sin(azel[1]), 2));//VALIDA SOLO PER ANGOLI DI ELEVAZIONE MAGGIORI DI 5° (DA VEDERE)!
+	double H = llh[2]; //(m)
+	double k1 = 77.604; //(K/mbar)
+	double k2 = 382000; //(K^2/mbar)
+	double Rd = 287.054; //(J/Kg/K)
+	double gm = 9.784; //(m/s^2)
+	double gi = 9.80665; //(m/s^2)
+	int giornoAnno = gpsTimeToGiorni(g);
+
+	double RISTropo = 0;
+
+	double Tz0dry = ((pow(10, -6) * k1 * Rd * parametroTropos('P', llh[0], giornoAnno)) / gm);
+	double Tz0wet = (pow(10, -6) * k2 * Rd * parametroTropos('e', llh[0], giornoAnno)) / ((((parametroTropos('l', llh[0], giornoAnno) + 1) * gm) - (parametroTropos('b', llh[0], giornoAnno) * Rd)) * parametroTropos('T', llh[0], giornoAnno));
+
+	double Tzdry = pow(1 - ((parametroTropos('b', llh[0], giornoAnno) * H) / parametroTropos('T', llh[0], giornoAnno)), gi / (Rd * parametroTropos('b', llh[0], giornoAnno))) * Tz0dry;
+	double Tzwet = pow(1 - ((parametroTropos('b', llh[0], giornoAnno) * H) / parametroTropos('T', llh[0], giornoAnno)), (((parametroTropos('l', llh[0], giornoAnno) + 1) * gi) / (Rd * parametroTropos('b', llh[0], giornoAnno))) - 1) * Tz0wet;
+
+	RISTropo = (Tzdry + Tzwet) * Me;
+
+	return RISTropo;
 }
 
 // Receiver antenna attenuation in dB for boresight angle = 0:5:180 [deg]
@@ -795,6 +996,7 @@ int replaceExpDesignator(char *str, int len)
 	return(n);
 }
 
+//effettua la sottrazione dei tempi g1-g0 (i sec e i week)
 double subGpsTime(gpstime_t g1, gpstime_t g0)
 {
 	double dt;
@@ -805,6 +1007,7 @@ double subGpsTime(gpstime_t g1, gpstime_t g0)
 	return(dt);
 }
 
+//Incrementa il tempo GPS g0 di un valore dt e lo ritorna sottoforma di gpstime_t
 gpstime_t incGpsTime(gpstime_t g0, double dt)
 {
 	gpstime_t g1;
@@ -836,15 +1039,19 @@ gpstime_t incGpsTime(gpstime_t g0, double dt)
  */
 int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fname)
 {
-	FILE *fp;
+	FILE *fp; //conterrà poi il file RINEX
 	int ieph;
 	
 	int sv;
 	char str[MAX_CHAR];
 	char tmp[20];
 
+	//tempo preso dal file RINEX in formato UTC
 	datetime_t t;
+
+	//tempo preso dal file RINEX convertito in GPS time
 	gpstime_t g;
+
 	gpstime_t g0;
 	double dt;
 
@@ -861,17 +1068,17 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 	// Read header lines
 	while (1)
 	{
-		if (NULL==fgets(str, MAX_CHAR, fp))
+		if (NULL==fgets(str, MAX_CHAR, fp))//legge MAX_CHAR caratteri da fp(dal file RINEX) e li mette in str. se è NULL, blocco il While.
 			break;
 
-		if (strncmp(str+60, "END OF HEADER", 13)==0)
+		if (strncmp(str+60, "END OF HEADER", 13)==0)//se alla fine della riga c'è scritto "END OF HEADER":
 			break;
-		else if (strncmp(str+60, "ION ALPHA", 9)==0)
+		else if (strncmp(str+60, "ION ALPHA", 9)==0)//se nella riga c'è scritto ION ALPHA:
 		{
-			strncpy(tmp, str+2, 12);
+			strncpy(tmp, str+2, 12);//copia 12 caratteri di str+2 su tmp(quindi da 2 a 12) che sarebbe la prima info
 			tmp[12] = 0;
 			replaceExpDesignator(tmp, 12);
-			ionoutc->alpha0 = atof(tmp);
+			ionoutc->alpha0 = atof(tmp);//atof converte da stringa a floating-point-number
 
 			strncpy(tmp, str+14, 12);
 			tmp[12] = 0;
@@ -952,7 +1159,7 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 		ionoutc->vflg = TRUE;
 
 	// Read ephemeris blocks
-	g0.week = -1;
+	g0.week = -1;//g0 è il GPStime, è una struct composta da week e sec(il clock del satellite).
 	ieph = 0;
 
 	while (1)
@@ -1186,6 +1393,10 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 	return(ieph);
 }
 
+/*
+modello utilizzato: https://gssc.esa.int/navipedia/index.php/Klobuchar_Ionospheric_Model#cite_note-3
+
+*/
 double ionosphericDelay(const ionoutc_t *ionoutc, gpstime_t g, double *llh, double *azel)
 {
 	double iono_delay = 0.0;
@@ -1325,6 +1536,8 @@ void computeRange(range_t *rho, ephem_t eph, ionoutc_t *ionoutc, gpstime_t g, do
 	rho->iono_delay = ionosphericDelay(ionoutc, g, llh, rho->azel);
 	rho->range += rho->iono_delay;
 
+	//Da aggiungere il tropospheric delay
+
 	return;
 }
 
@@ -1401,7 +1614,10 @@ int readUserMotion(double xyz[USER_MOTION_SIZE][3], const char *filename)
 
 	return (numd);
 }
-
+/*Ritorna un intero che diviso 10, si ottengono i secondi di simulazione.
+ogni 10 punti GGA corrisponde un secondo di simulazione.
+output=xyz (coordinate in ECEF)
+*/
 int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename)
 {
 	FILE *fp;
@@ -1483,6 +1699,9 @@ int readNmeaGGA(double xyz[USER_MOTION_SIZE][3], const char *filename)
 	return (numd);
 }
 
+/*
+Genera il messaggio navigazione (output=chan)
+*/
 int generateNavMsg(gpstime_t g, channel_t *chan, int init)
 {
 	int iwrd,isbf;
@@ -1587,7 +1806,12 @@ int checkSatVisibility(ephem_t eph, gpstime_t g, double *xyz, double elvMask, do
 	// else
 	return (0); // Invisible
 }
-
+/* output1=chan
+input2=eph
+input3=ionoutc
+input4=grx (gpsTime incrementato man mano di dt).
+...
+*/
 int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t grx, double *xyz, double elvMask)
 {
 	int nsat=0;
@@ -1635,7 +1859,7 @@ int allocateChannel(channel_t *chan, ephem_t *eph, ionoutc_t ionoutc, gpstime_t 
 
 						computeRange(&rho, eph[sv], &ionoutc, grx, ref);
 						r_ref = rho.range;
-
+						//LambdaL1 è la lunghezza d'onda della banda L1 in metri, inizializza la fase in modo sperimentale
 						phase_ini = (2.0*r_ref - r_xyz)/LAMBDA_L1;
 #ifdef FLOAT_CARR_PHASE
 						chan[i].carr_phase = phase_ini - floor(phase_ini);
@@ -1696,7 +1920,7 @@ int main(int argc, char *argv[])
 
 	int sv;
 	int neph,ieph;
-	ephem_t eph[EPHEM_ARRAY_SIZE][MAX_SAT];
+	ephem_t eph[EPHEM_ARRAY_SIZE][MAX_SAT];//rappresenta le effemeridi di un singolo satellite, (ogni colonna rappresenta un satellite diverso)
 	gpstime_t g0;
 	
 	double llh[3];
@@ -1716,13 +1940,18 @@ int main(int argc, char *argv[])
 
 	int iumd;
 	int numd;
+
+	//Contiene il file utilizzato per la dynamic mode (es. flusso stream GGA NMEA).
 	char umfile[MAX_CHAR];
+
 	double xyz[USER_MOTION_SIZE][3];
 
 	int staticLocationMode = FALSE;
 	int nmeaGGA = FALSE;
 
+	//Contiene il file RINEX specificato in args.
 	char navfile[MAX_CHAR];
+	//contiene il file di output binario
 	char outfile[MAX_CHAR];
 
 	double samp_freq;
@@ -1741,8 +1970,9 @@ int main(int argc, char *argv[])
 	gpstime_t gmin,gmax;
 	double dt;
 	int igrx;
-
+	//Durata (in secondi) data in args.
 	double duration;
+
 	int iduration;
 	int verb;
 
@@ -1772,27 +2002,27 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	while ((result=getopt(argc,argv,"e:u:g:c:l:o:s:b:T:t:d:iv"))!=-1)
+	while ((result=getopt(argc,argv,"e:u:g:c:l:o:s:b:T:t:d:iv"))!=-1)//scorre gli argomenti passati quando si esegue il programma
 	{
 		switch (result)
 		{
-		case 'e':
+		case 'e'://e è il file RINEX di navigazione (OBBLIGATORIO)
 			strcpy(navfile, optarg);
 			break;
-		case 'u':
+		case 'u'://u è il file user motion per la (dynamic mode)
 			strcpy(umfile, optarg);
 			nmeaGGA = FALSE;
 			break;
-		case 'g':
+		case 'g'://g è un file NMEA GGA stream
 			strcpy(umfile, optarg);
 			nmeaGGA = TRUE;
 			break;
-		case 'c':
+		case 'c'://c è usato quando si vogliono mettere coordinate statiche in ECEF (x, y, z)
 			// Static ECEF coordinates input mode
 			staticLocationMode = TRUE;
 			sscanf(optarg,"%lf,%lf,%lf",&xyz[0][0],&xyz[0][1],&xyz[0][2]);
 			break;
-		case 'l':
+		case 'l'://l è per coordinate statiche geodetiche(latitudine, longitudine, altezza)
 			// Static geodetic coordinates input mode
 			// Added by scateu@gmail.com
 			staticLocationMode = TRUE;
@@ -1801,10 +2031,10 @@ int main(int argc, char *argv[])
 			llh[1] = llh[1] / R2D; // convert to RAD
 			llh2xyz(llh,xyz[0]); // Convert llh to xyz
 			break;
-		case 'o':
+		case 'o'://usato per indicare la location del file I/Q di output(default: gpssim.bin)
 			strcpy(outfile, optarg);
 			break;
-		case 's':
+		case 's'://frequenza di campionamento (default: 2600000Hz)
 			samp_freq = atof(optarg);
 			if (samp_freq<1.0e6)
 			{
@@ -1812,7 +2042,7 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 			break;
-		case 'b':
+		case 'b'://formato dei bit I/Q (1bit/8bit/16bit) (default: 8bit)
 			data_format = atoi(optarg);
 			if (data_format!=SC01 && data_format!=SC08 && data_format!=SC16)
 			{
@@ -1837,7 +2067,7 @@ int main(int argc, char *argv[])
 				t0.mm = gmt->tm_min;
 				t0.sec = (double)gmt->tm_sec;
 
-				date2gps(&t0, &g0);
+				date2gps(&t0, &g0);//mette in g0 il tempo attuale da UTC in formato GPS.
 
 				break;
 			}
@@ -1858,7 +2088,7 @@ int main(int argc, char *argv[])
 		case 'i':
 			ionoutc.enable = FALSE; // Disable ionospheric correction
 			break;
-		case 'v':
+		case 'v'://verbose mode per mostrare dettagli durante l'esecuzione
 			verb = TRUE;
 			break;
 		case ':':
@@ -1890,7 +2120,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "ERROR: Invalid duration.\n");
 		exit(1);
 	}
-	iduration = (int)(duration*10.0 + 0.5);
+	iduration = (int)(duration*10.0 + 0.5);//moltiplico per 10 perchè sono 10 campioni al secondo.
 
 	// Buffer size	
 	samp_freq = floor(samp_freq/10.0);
@@ -1960,7 +2190,7 @@ int main(int argc, char *argv[])
 			ionoutc.A0, ionoutc.A1, ionoutc.tot, ionoutc.wnt);
 		fprintf(stderr, "%6d\n", ionoutc.dtls);
 	}
-
+	//scorre le colonne della matrice di eph[0], e se il vflg==1 salva gmin e tmin. 
 	for (sv=0; sv<MAX_SAT; sv++) 
 	{
 		if (eph[0][sv].vflg==1)
@@ -1979,9 +2209,10 @@ int main(int argc, char *argv[])
 	tmax.d = 0;
 	tmax.m = 0;
 	tmax.y = 0;
+	//scorre le colonne della matrice di eph[neph-1](ultima riga), e se il vflg==1 salva gmax e tmax. 
 	for (sv=0; sv<MAX_SAT; sv++)
 	{
-		if (eph[neph-1][sv].vflg == 1)
+		if (eph[neph-1][sv].vflg == 1)//(neph-1) è l'indice dell'ultima riga della matrice eph.
 		{
 			gmax = eph[neph-1][sv].toc;
 			tmax = eph[neph-1][sv].t;
@@ -2064,6 +2295,7 @@ int main(int argc, char *argv[])
 				dt = subGpsTime(g0, eph[i][sv].toc);
 				if (dt>=-SECONDS_IN_HOUR && dt<SECONDS_IN_HOUR)
 				{
+					//memorizzo in ieph la riga in cui trovo il primo elemento con .vflg==1
 					ieph = i;
 					break;
 				}
@@ -2085,6 +2317,7 @@ int main(int argc, char *argv[])
 	////////////////////////////////////////////////////////////
 
 	// Allocate I/Q buffer
+	//Alloca 16 bit per ogni posizione (2*iq_buffer_size perchè bisogna memorizzare sia le I che le Q).
 	iq_buff = calloc(2*iq_buff_size, 2);
 
 	if (iq_buff==NULL)
@@ -2092,7 +2325,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "ERROR: Faild to allocate 16-bit I/Q buffer.\n");
 		exit(1);
 	}
-
+	//se dataformat è indicato ad 8, alloca 8 bit
 	if (data_format==SC08)
 	{
 		iq8_buff = calloc(2*iq_buff_size, 1);
@@ -2114,7 +2347,7 @@ int main(int argc, char *argv[])
 
 	// Open output file
 	// "-" can be used as name for stdout
-	if(strcmp("-", outfile)){
+	if(strcmp("-", outfile)){//se outfile è diverso da "-" entro nell'if
 		if (NULL==(fp=fopen(outfile,"wb")))
 		{
 			fprintf(stderr, "ERROR: Failed to open output file.\n");
@@ -2145,6 +2378,7 @@ int main(int argc, char *argv[])
 	for(i=0; i<MAX_CHAN; i++)
 	{
 		if (chan[i].prn>0)
+			//STAMPO I PRN, AZIMUTH, ELEVATION, GEOMETRIC DISTANCE, IONODELAY
 			fprintf(stderr, "%02d %6.1f %5.1f %11.1f %5.1f\n", chan[i].prn, 
 				chan[i].azel[0]*R2D, chan[i].azel[1]*R2D, chan[i].rho0.d, chan[i].rho0.iono_delay);
 	}
@@ -2179,7 +2413,7 @@ int main(int argc, char *argv[])
 				if (!staticLocationMode)
 					computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[iumd]);
 				else
-					computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[0]);
+					computeRange(&rho, eph[ieph][sv], &ionoutc, grx, xyz[0]);//(implementazione modifica dinamica percorso) Prima di qui modificare xyz[istanteAttuale][3coord]
 
 				chan[i].azel[0] = rho.azel[0];
 				chan[i].azel[1] = rho.azel[1];
@@ -2287,7 +2521,7 @@ int main(int argc, char *argv[])
 				iq8_buff[isamp/8] |= (iq_buff[isamp]>0?0x01:0x00)<<(7-isamp%8);
 			}
 
-			fwrite(iq8_buff, 1, iq_buff_size/4, fp);
+			fwrite(iq8_buff, 1, iq_buff_size/4, fp);//scrive su fp, (iq_buff_size/4) elementi, ciascuno di dimensione 1
 		}
 		else if (data_format==SC08)
 		{
@@ -2298,6 +2532,7 @@ int main(int argc, char *argv[])
 		} 
 		else // data_format==SC16
 		{
+			//scrive su fp, 2*iq_buff_size elementi, ciascuno di dimensione 2. Il primo elemento e' individuato dal puntatore iq_buff.
 			fwrite(iq_buff, 2, 2*iq_buff_size, fp);
 		}
 
@@ -2362,7 +2597,7 @@ int main(int argc, char *argv[])
 		grx = incGpsTime(grx, 0.1);
 
 		// Update time counter
-		fprintf(stderr, "\rTime into run = %4.1f", subGpsTime(grx, g0));
+		fprintf(stderr, "\rTime into run = %4.1f", subGpsTime(grx, g0));//(\r serve per printare sempre sulla stessa riga) (g0 è lo scenario start time)
 		fflush(stdout);
 	}
 

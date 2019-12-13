@@ -81,6 +81,25 @@ int cosTable512[] = {
 	 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 241, 242, 243, 244, 244, 245,
 	 245, 246, 247, 247, 248, 248, 248, 249, 249, 249, 249, 250, 250, 250, 250, 250
 };
+/*
+funzione che converte da gpstime_t a numero di giorni passati da gennaio
+Serve per il modello della troposfera
+*/
+int gpsTimeToGiorni(gpstime_t g) {
+	int weeknumber;
+	double seconds;
+	weeknumber = g.week;
+	seconds = g.sec;
+	double days = weeknumber * 7;
+	double temp = 0;
+	if (seconds > SECONDS_IN_DAY) {
+		temp = seconds / SECONDS_IN_DAY;
+		days += temp;
+	}
+	int giorniTOT = (int)days;
+	int giorniDaGennaio = giorniTOT % 365;
+	return giorniDaGennaio;
+}
 
 // Receiver antenna attenuation in dB for boresight angle = 0:5:180 [deg]
 double ant_pat_db[37] = {
